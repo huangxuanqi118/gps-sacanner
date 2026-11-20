@@ -1,0 +1,6 @@
+{
+  "name": "GPS Scanner",
+  "description": "Simple one-tap GPS and tracker detector: scan nearby BLE tracker beacons, detect magnetic GPS mounts via magnetometer, and check device GPS hardware and satellite signals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

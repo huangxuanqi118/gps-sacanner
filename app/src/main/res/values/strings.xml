@@ -1,0 +1,58 @@
+<resources>
+    <string name="app_name">GPS Scanner</string>
+    <string name="app_subtitle">One-tap tracker scan &amp; GPS hardware check</string>
+    <string name="info_cd">How detection works</string>
+    <string name="tab_tracker_scan">Tracker Scan</string>
+    <string name="tab_device_gps">Device GPS</string>
+
+    <string name="action_start_scan">Start Scan</string>
+    <string name="action_stop_scan">Stop Scan</string>
+    <string name="action_rescan">Scan Again</string>
+    <string name="action_calibrate">Calibrate</string>
+    <string name="action_grant_ble">Allow Bluetooth Scan</string>
+    <string name="action_enable_bt">Turn On Bluetooth</string>
+    <string name="action_grant_location">Allow Location Access</string>
+    <string name="action_open_location_settings">Open Location Settings</string>
+    <string name="action_close">Got It</string>
+
+    <string name="verdict_idle_title">Ready to Scan</string>
+    <string name="verdict_idle_desc">Tap below to scan for nearby GPS trackers and check signal status</string>
+    <string name="verdict_scanning_title">Scanning Signals…</string>
+    <string name="verdict_scanning_desc">Move your phone slowly near target areas to detect BLE beacons and magnetic spikes</string>
+    <string name="verdict_safe_title">No Suspicious Signals Found</string>
+    <string name="verdict_safe_desc">No strong magnetic anomalies or known BLE tracker beacons detected</string>
+    <string name="verdict_attention_title">Close Signal or Magnetic Shift Detected</string>
+    <string name="verdict_attention_desc">Check the highlighted nearby devices or elevated magnetic area below</string>
+    <string name="verdict_alert_title">Potential Tracker or Strong Magnet Detected</string>
+    <string name="verdict_alert_desc">A known tracker beacon or strong magnetic mount was found — inspect the area closely</string>
+
+    <string name="mag_card_title">Magnetic Mount Detector</string>
+    <string name="mag_card_hint">Move slowly along seats, glovebox, trunk, bumpers, or underbody edges</string>
+    <string name="mag_not_supported">Magnetometer sensor is not available on this device</string>
+    <string name="mag_status_normal">Normal</string>
+    <string name="mag_status_elevated">Elevated</string>
+    <string name="mag_status_strong">Strong Spike</string>
+    <string name="mag_baseline_fmt">Baseline %1$.1f μT · Peak %2$.1f μT</string>
+
+    <string name="ble_card_title">Bluetooth Tracker Scan</string>
+    <string name="ble_not_supported">Bluetooth Low Energy (BLE) is not supported on this device</string>
+    <string name="ble_need_permission">Bluetooth scan permission is needed to detect nearby AirTag, SmartTag, and Tile beacons</string>
+    <string name="ble_bt_disabled">Turn on Bluetooth to scan for nearby wireless tracker beacons</string>
+    <string name="ble_empty_idle">Tap Start Scan to check nearby Bluetooth signals</string>
+    <string name="ble_empty_scanning">Listening for nearby Bluetooth beacons…</string>
+    <string name="ble_empty_none">No tracker beacons or Bluetooth signals detected</string>
+    <string name="ble_summary_fmt">%1$d signals found · %2$d potential trackers</string>
+
+    <string name="gps_hw_card_title">Device GPS Hardware</string>
+    <string name="gps_hw_installed">GPS hardware module installed</string>
+    <string name="gps_hw_missing">No GPS hardware module detected</string>
+    <string name="gps_provider_on">Location service &amp; GPS provider enabled</string>
+    <string name="gps_provider_off">System location service is turned off</string>
+    <string name="gps_sat_card_title">Live Satellite Signals</string>
+    <string name="gps_need_permission">Grant location permission to inspect live satellite count and signal strength</string>
+    <string name="gps_searching">Searching for GPS / GNSS satellites…</string>
+    <string name="gps_no_satellites">No satellites locked yet (try moving near a window or outdoors)</string>
+
+    <string name="info_dialog_title">How Detection Works</string>
+    <string name="info_dialog_body">1. Magnetic Mount Detector: Many hidden vehicle GPS trackers use strong magnets. Your phone magnetometer measures magnetic flux in μT to spot hidden magnetic spikes (typically &gt; 85 μT).\n\n2. Bluetooth Tracker Scan: Scans nearby BLE advertisements to flag AirTag / Find My, Samsung SmartTag, Tile, and close-range wireless beacons.\n\n3. Device GPS Check: Verifies whether GPS hardware is installed on your device and reads live GNSS satellite signal strength (dB-Hz).\n\nNote: Passive cellular-only trackers with no magnet or Bluetooth radio cannot be directly detected by standard phone sensors.</string>
+</resources>
