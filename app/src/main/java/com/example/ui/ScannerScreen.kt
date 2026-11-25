@@ -1,7 +1,10 @@
 package com.example.ui
 
 import android.Manifest
+import android.app.Activity
 import android.bluetooth.BluetoothAdapter
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
@@ -29,12 +32,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.rounded.Radar
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -78,7 +83,7 @@ fun ScannerScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshEnvironment()
+                viewModel.onResume()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -163,6 +168,42 @@ fun ScannerScreen(
                     }
                 },
                 actions = {
+                    FilledTonalButton(
+                        onClick = { viewModel.setSubscriptionSheetVisible(true) },
+                        modifier = Modifier
+                            .height(48.dp)
+                            .padding(vertical = 4.dp)
+                            .testTag("pro_upgrade_button"),
+                        contentPadding = PaddingValues(horizontal = 12.dp),
+                        shape = RoundedCornerShape(50),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = if (state.subscription.isProActive) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHigh
+                            },
+                            contentColor = if (state.subscription.isProActive) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.WorkspacePremium,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (state.subscription.isProActive) {
+                                stringResource(R.string.badge_pro)
+                            } else {
+                                stringResource(R.string.action_go_pro)
+                            },
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
                     IconButton(
                         onClick = { viewModel.setInfoDialogVisible(true) },
                         modifier = Modifier
@@ -297,6 +338,20 @@ fun ScannerScreen(
             }
         )
     }
+
+    if (state.showSubscriptionSheet) {
+        SubscriptionBottomSheet(
+            billingState = state.subscription,
+            onDismiss = { viewModel.setSubscriptionSheetVisible(false) },
+            onSubscribeClick = { offer ->
+                context.findActivity()?.let { activity ->
+                    viewModel.purchaseSubscription(activity, offer)
+                }
+            },
+            onRestoreClick = viewModel::restorePurchases,
+            onRetrySyncClick = viewModel::retryStoreSync
+        )
+    }
 }
 
 @Composable
@@ -322,13 +377,17 @@ private fun HeroRadarCard(
     } else {
         when {
             !state.gnss.hasGpsHardware ->
-                stringResource(R.string.gps_hw_missing) to "This device does not report a built-in GPS receiver"
+                stringResource(R.string.gps_hw_missing) to stringResource(R.string.verdict_gps_missing_desc)
             state.gnss.usedCount > 0 ->
-                "Device GPS Active" to "Locked onto ${state.gnss.usedCount} satellites (${state.gnss.satellites.size} visible)"
+                stringResource(R.string.verdict_gps_active_title) to stringResource(
+                    R.string.verdict_gps_active_desc_fmt,
+                    state.gnss.usedCount,
+                    state.gnss.satellites.size
+                )
             state.isScanning ->
-                "Checking Device GPS…" to "Reading GNSS satellite signal-to-noise ratio and lock status"
+                stringResource(R.string.verdict_gps_checking_title) to stringResource(R.string.verdict_gps_checking_desc)
             else ->
-                "GPS Hardware Ready" to "Tap Start Scan to verify live GPS / GNSS satellite reception"
+                stringResource(R.string.verdict_gps_ready_title) to stringResource(R.string.verdict_gps_ready_desc)
         }
     }
 
@@ -419,7 +478,11 @@ private fun HeroRadarCard(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (state.isScanning) {
-                        "${stringResource(R.string.action_stop_scan)} (${state.remainingSeconds}s)"
+                        if (state.subscription.isProActive) {
+                            "${stringResource(R.string.action_stop_scan)} (PRO)"
+                        } else {
+                            "${stringResource(R.string.action_stop_scan)} (${state.remainingSeconds}s)"
+                        }
                     } else if (state.ble.hasScannedOnce && state.activeTab == DetectionTab.TRACKER_SCAN) {
                         stringResource(R.string.action_rescan)
                     } else {
@@ -444,4 +507,10 @@ private fun verdictColor(verdict: OverallVerdict, activeTab: DetectionTab): Colo
         OverallVerdict.ATTENTION -> MaterialTheme.colorScheme.tertiary
         OverallVerdict.ALERT -> MaterialTheme.colorScheme.error
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

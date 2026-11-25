@@ -1,8 +1,12 @@
 package com.example.ui
 
+import android.app.Activity
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.billing.PlayBillingManager
+import com.example.billing.SubscriptionPlanOffer
+import com.example.billing.SubscriptionUiState
 import com.example.detector.BleScanEvent
 import com.example.detector.BleSignalItem
 import com.example.detector.BleTrackerDetector
@@ -50,13 +54,16 @@ data class DetectorUiState(
     val ble: BleUiState = BleUiState(),
     val gnss: GnssSnapshot = GnssSnapshot(),
     val verdict: OverallVerdict = OverallVerdict.IDLE,
-    val showInfoDialog: Boolean = false
+    val showInfoDialog: Boolean = false,
+    val showSubscriptionSheet: Boolean = false,
+    val subscription: SubscriptionUiState = SubscriptionUiState()
 )
 
 class DetectorViewModel(application: Application) : AndroidViewModel(application) {
     private val magnetometer = MagnetometerDetector(application)
     private val bleDetector = BleTrackerDetector(application)
     private val gnssDetector = GnssHardwareDetector(application)
+    private val billingManager = PlayBillingManager(application)
 
     private val _uiState = MutableStateFlow(DetectorUiState())
     val uiState: StateFlow<DetectorUiState> = _uiState.asStateFlow()
@@ -71,6 +78,12 @@ class DetectorViewModel(application: Application) : AndroidViewModel(application
     private val discoveredDevices = linkedMapOf<String, BleSignalItem>()
 
     init {
+        billingManager.start()
+        viewModelScope.launch {
+            billingManager.state.collect { subState ->
+                _uiState.update { it.copy(subscription = subState) }
+            }
+        }
         refreshEnvironment()
         startMagnetometer()
     }
@@ -96,6 +109,11 @@ class DetectorViewModel(application: Application) : AndroidViewModel(application
         recomputeVerdict()
     }
 
+    fun onResume() {
+        refreshEnvironment()
+        billingManager.connectAndSync()
+    }
+
     fun selectTab(tab: DetectionTab) {
         if (_uiState.value.activeTab == tab) return
         stopScanning()
@@ -108,6 +126,25 @@ class DetectorViewModel(application: Application) : AndroidViewModel(application
 
     fun setInfoDialogVisible(visible: Boolean) {
         _uiState.update { it.copy(showInfoDialog = visible) }
+    }
+
+    fun setSubscriptionSheetVisible(visible: Boolean) {
+        if (visible) {
+            billingManager.clearStatusMessage()
+        }
+        _uiState.update { it.copy(showSubscriptionSheet = visible) }
+    }
+
+    fun purchaseSubscription(activity: Activity, offer: SubscriptionPlanOffer) {
+        billingManager.launchPurchase(activity, offer)
+    }
+
+    fun restorePurchases() {
+        billingManager.restorePurchases()
+    }
+
+    fun retryStoreSync() {
+        billingManager.connectAndSync()
     }
 
     fun calibrateMagnetometer() {
@@ -129,17 +166,10 @@ class DetectorViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun toggleScan() {
-        if (_uiState.value.isScanning) {
-            stopScanning()
-        } else {
-            startScanning()
-        }
-    }
-
     fun startScanning() {
         refreshEnvironment()
         val tab = _uiState.value.activeTab
+        val isPro = _uiState.value.subscription.isProActive
 
         scanTimerJob?.cancel()
         bleScanJob?.cancel()
@@ -150,7 +180,7 @@ class DetectorViewModel(application: Application) : AndroidViewModel(application
             _uiState.update {
                 it.copy(
                     isScanning = true,
-                    remainingSeconds = SCAN_DURATION_SECONDS,
+                    remainingSeconds = if (isPro) 0 else SCAN_DURATION_SECONDS,
                     ble = it.ble.copy(
                         hasScannedOnce = true,
                         devices = emptyList(),
@@ -165,7 +195,7 @@ class DetectorViewModel(application: Application) : AndroidViewModel(application
             _uiState.update {
                 it.copy(
                     isScanning = true,
-                    remainingSeconds = SCAN_DURATION_SECONDS
+                    remainingSeconds = if (isPro) 0 else SCAN_DURATION_SECONDS
                 )
             }
             startGnssObservation()
@@ -173,12 +203,15 @@ class DetectorViewModel(application: Application) : AndroidViewModel(application
 
         recomputeVerdict()
 
-        scanTimerJob = viewModelScope.launch {
-            for (sec in SCAN_DURATION_SECONDS downTo 1) {
-                _uiState.update { it.copy(remainingSeconds = sec) }
-                delay(1000L)
+        // Pro members scan continuously without a 20s timeout
+        if (!isPro) {
+            scanTimerJob = viewModelScope.launch {
+                for (sec in SCAN_DURATION_SECONDS downTo 1) {
+                    _uiState.update { it.copy(remainingSeconds = sec) }
+                    delay(1000L)
+                }
+                stopScanning()
             }
-            stopScanning()
         }
     }
 
@@ -296,6 +329,7 @@ class DetectorViewModel(application: Application) : AndroidViewModel(application
         bleScanJob?.cancel()
         gnssJob?.cancel()
         scanTimerJob?.cancel()
+        billingManager.release()
     }
 
     companion object {

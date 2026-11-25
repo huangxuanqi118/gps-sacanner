@@ -30,7 +30,7 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `scanner screen displays primary scan button and switches tabs`() {
+    fun `scanner screen switches tabs and opens pro subscription sheet`() {
         composeTestRule.setContent {
             GpsDetectorTheme {
                 ScannerScreen()
@@ -42,5 +42,9 @@ class ExampleRobolectricTest {
 
         composeTestRule.onNodeWithTag("tab_device_gps").performClick()
         composeTestRule.onNodeWithTag("scan_toggle_button").assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag("pro_upgrade_button").performClick()
+        composeTestRule.onNodeWithTag("plan_monthly_card").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("plan_annual_card").assertIsDisplayed()
     }
 }

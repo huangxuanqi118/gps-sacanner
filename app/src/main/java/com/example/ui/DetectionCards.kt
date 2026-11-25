@@ -15,8 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.BluetoothSearching
 import androidx.compose.material.icons.rounded.Bluetooth
-import androidx.compose.material.icons.rounded.BluetoothSearching
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.GpsFixed
@@ -215,7 +215,7 @@ fun BleSignalsCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = if (isScanning) {
-                            Icons.Rounded.BluetoothSearching
+                            Icons.AutoMirrored.Rounded.BluetoothSearching
                         } else {
                             Icons.Rounded.Bluetooth
                         },
@@ -233,7 +233,7 @@ fun BleSignalsCard(
 
                 if (bleState.hasScannedOnce && bleState.devices.isNotEmpty()) {
                     StatusChip(
-                        label = "${bleState.devices.size} found",
+                        label = stringResource(R.string.ble_found_count_fmt, bleState.devices.size),
                         color = highlightColor
                     )
                 }
@@ -518,7 +518,7 @@ fun GnssSatellitesCard(
                     )
                 }
                 StatusChip(
-                    label = "${gnss.usedCount}/${gnss.satellites.size} in fix",
+                    label = stringResource(R.string.gps_in_fix_fmt, gnss.usedCount, gnss.satellites.size),
                     color = if (gnss.usedCount > 0) {
                         MaterialTheme.colorScheme.primary
                     } else {
@@ -534,12 +534,12 @@ fun GnssSatellitesCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 MetricMiniBox(
-                    title = "Visible",
+                    title = stringResource(R.string.gps_metric_visible),
                     value = "${gnss.satellites.size}",
                     modifier = Modifier.weight(1f)
                 )
                 MetricMiniBox(
-                    title = "Avg Signal",
+                    title = stringResource(R.string.gps_metric_avg_signal),
                     value = if (gnss.averageCn0 > 0f) {
                         String.format(Locale.US, "%.1f dB", gnss.averageCn0)
                     } else {
@@ -548,7 +548,7 @@ fun GnssSatellitesCard(
                     modifier = Modifier.weight(1f)
                 )
                 MetricMiniBox(
-                    title = "Accuracy",
+                    title = stringResource(R.string.gps_metric_accuracy),
                     value = gnss.accuracyMeters?.let {
                         String.format(Locale.US, "%.1f m", it)
                     } ?: "--",
@@ -564,9 +564,8 @@ fun GnssSatellitesCard(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = String.format(
-                            Locale.US,
-                            "Coordinates: %.5f, %.5f",
+                        text = stringResource(
+                            R.string.gps_coordinates_fmt,
                             gnss.latitude,
                             gnss.longitude
                         ),

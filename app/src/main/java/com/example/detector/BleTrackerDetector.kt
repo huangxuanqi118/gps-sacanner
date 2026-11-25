@@ -12,6 +12,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
+import com.example.R
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -20,6 +21,15 @@ enum class TrackerRisk {
     CONFIRMED_TRACKER_TYPE,
     CLOSE_STRONG_SIGNAL,
     NEARBY_BLE
+}
+
+enum class TrackerSignature {
+    FIND_MY,
+    APPLE_FIND_NETWORK,
+    SMART_TAG,
+    TILE,
+    BEACON,
+    SUSPECTED_KEYWORD
 }
 
 data class BleSignalItem(
@@ -71,24 +81,24 @@ class BleTrackerDetector(private val context: Context) {
     fun scanBleTrackers(): Flow<BleScanEvent> = callbackFlow {
         val adapter: BluetoothAdapter? = bluetoothManager?.adapter
         if (!isBleSupported || adapter == null) {
-            trySend(BleScanEvent.Error("Bluetooth LE is not supported"))
+            trySend(BleScanEvent.Error(context.getString(R.string.ble_err_unsupported)))
             close()
             return@callbackFlow
         }
         if (!hasScanPermission()) {
-            trySend(BleScanEvent.Error("Bluetooth scan permission required"))
+            trySend(BleScanEvent.Error(context.getString(R.string.ble_err_permission)))
             close()
             return@callbackFlow
         }
         if (!adapter.isEnabled) {
-            trySend(BleScanEvent.Error("Bluetooth is turned off"))
+            trySend(BleScanEvent.Error(context.getString(R.string.ble_err_disabled)))
             close()
             return@callbackFlow
         }
 
         val scanner: BluetoothLeScanner? = adapter.bluetoothLeScanner
         if (scanner == null) {
-            trySend(BleScanEvent.Error("Bluetooth scanner unavailable"))
+            trySend(BleScanEvent.Error(context.getString(R.string.ble_err_unavailable)))
             close()
             return@callbackFlow
         }
@@ -105,7 +115,7 @@ class BleTrackerDetector(private val context: Context) {
             }
 
             override fun onScanFailed(errorCode: Int) {
-                trySend(BleScanEvent.Error("Bluetooth scan failed (code $errorCode)"))
+                trySend(BleScanEvent.Error(context.getString(R.string.ble_err_failed_fmt, errorCode)))
             }
         }
 
@@ -115,12 +125,12 @@ class BleTrackerDetector(private val context: Context) {
 
         try {
             scanner.startScan(null, settings, callback)
-        } catch (e: SecurityException) {
-            trySend(BleScanEvent.Error("Bluetooth scan permission denied"))
+        } catch (_: SecurityException) {
+            trySend(BleScanEvent.Error(context.getString(R.string.ble_err_denied)))
             close()
             return@callbackFlow
-        } catch (e: IllegalStateException) {
-            trySend(BleScanEvent.Error("Bluetooth unavailable; please toggle Bluetooth"))
+        } catch (_: IllegalStateException) {
+            trySend(BleScanEvent.Error(context.getString(R.string.ble_err_state)))
             close()
             return@callbackFlow
         }
@@ -138,18 +148,19 @@ class BleTrackerDetector(private val context: Context) {
         val record = result.scanRecord
         // Use ScanRecord.deviceName so BLUETOOTH_CONNECT is not required on Android 12+
         val rawName = record?.deviceName?.trim().orEmpty()
-        val displayName = rawName.ifEmpty { "Unknown BLE Device" }
+        val displayName = rawName.ifEmpty { context.getString(R.string.ble_unknown_device) }
         val rssi = result.rssi
         val address = result.device?.address ?: "UNKNOWN"
 
         val serviceUuids = record?.serviceUuids.orEmpty().map { it.uuid.toString().lowercase() }
         val appleData = record?.getManufacturerSpecificData(0x004C)
 
-        val trackerTag = identifyTrackerSignature(
+        val signature = identifyTrackerSignature(
             rawName = rawName.lowercase(),
             serviceUuids = serviceUuids,
             appleManufacturerBytes = appleData
         )
+        val trackerTag = signature?.let { signatureLabel(it) }
 
         val risk = when {
             trackerTag != null -> TrackerRisk.CONFIRMED_TRACKER_TYPE
@@ -158,10 +169,10 @@ class BleTrackerDetector(private val context: Context) {
         }
 
         val proximityLabel = when {
-            rssi >= -55 -> "Very Close (<1m)"
-            rssi >= -68 -> "Near (1–3m)"
-            rssi >= -82 -> "Medium (3–8m)"
-            else -> "Far (>8m)"
+            rssi >= -55 -> context.getString(R.string.ble_prox_very_close)
+            rssi >= -68 -> context.getString(R.string.ble_prox_near)
+            rssi >= -82 -> context.getString(R.string.ble_prox_medium)
+            else -> context.getString(R.string.ble_prox_far)
         }
 
         return BleSignalItem(
@@ -175,6 +186,15 @@ class BleTrackerDetector(private val context: Context) {
         )
     }
 
+    private fun signatureLabel(signature: TrackerSignature): String = when (signature) {
+        TrackerSignature.FIND_MY -> context.getString(R.string.ble_sig_find_my)
+        TrackerSignature.APPLE_FIND_NETWORK -> context.getString(R.string.ble_sig_apple_find)
+        TrackerSignature.SMART_TAG -> context.getString(R.string.ble_sig_smart_tag)
+        TrackerSignature.TILE -> context.getString(R.string.ble_sig_tile)
+        TrackerSignature.BEACON -> context.getString(R.string.ble_sig_beacon)
+        TrackerSignature.SUSPECTED_KEYWORD -> context.getString(R.string.ble_sig_suspected)
+    }
+
     companion object {
         private const val FIND_MY_UUID = "0000fd6f-0000-1000-8000-00805f9b34fb"
         private const val SMART_TAG_UUID = "0000fd5a-0000-1000-8000-00805f9b34fb"
@@ -186,28 +206,28 @@ class BleTrackerDetector(private val context: Context) {
             rawName: String,
             serviceUuids: List<String>,
             appleManufacturerBytes: ByteArray?
-        ): String? {
+        ): TrackerSignature? {
             if (serviceUuids.any { it == FIND_MY_UUID }) {
-                return "Find My / AirTag Beacon"
+                return TrackerSignature.FIND_MY
             }
             if (appleManufacturerBytes != null && appleManufacturerBytes.isNotEmpty()) {
                 val typeByte = appleManufacturerBytes[0].toInt() and 0xFF
                 if (typeByte == 0x12 || typeByte == 0x07) {
-                    return "Apple Find My / AirTag Signal"
+                    return TrackerSignature.APPLE_FIND_NETWORK
                 }
             }
             if (serviceUuids.any { it == SMART_TAG_UUID }) {
-                return "Samsung SmartTag Tracker"
+                return TrackerSignature.SMART_TAG
             }
             if (serviceUuids.any { it == TILE_UUID }) {
-                return "Tile Bluetooth Tracker"
+                return TrackerSignature.TILE
             }
             if (serviceUuids.any { it == GOOGLE_FIND_UUID || it == EDDYSTONE_UUID }) {
-                return "Tracking / Eddystone Beacon"
+                return TrackerSignature.BEACON
             }
             val keywords = listOf("airtag", "smarttag", "tile", "tracker", "gps", "itag", "findmy", "locator")
             if (keywords.any { rawName.contains(it) }) {
-                return "Suspected GPS / BLE Tracker"
+                return TrackerSignature.SUSPECTED_KEYWORD
             }
             return null
         }

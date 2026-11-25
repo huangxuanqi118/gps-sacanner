@@ -109,7 +109,10 @@ class GnssHardwareDetector(private val context: Context) {
                     list.add(
                         SatelliteInfo(
                             svid = status.getSvid(i),
-                            constellation = constellationName(status.getConstellationType(i)),
+                            constellation = constellationName(
+                                type = status.getConstellationType(i),
+                                otherLabel = context.getString(com.example.R.string.constellation_other)
+                            ),
                             cn0DbHz = status.getCn0DbHz(i),
                             usedInFix = status.usedInFix(i)
                         )
@@ -166,14 +169,14 @@ class GnssHardwareDetector(private val context: Context) {
     }
 
     companion object {
-        fun constellationName(type: Int): String = when (type) {
+        fun constellationName(type: Int, otherLabel: String = "Other"): String = when (type) {
             GnssStatus.CONSTELLATION_GPS -> "GPS"
             GnssStatus.CONSTELLATION_BEIDOU -> "BeiDou"
             GnssStatus.CONSTELLATION_GLONASS -> "GLONASS"
             GnssStatus.CONSTELLATION_GALILEO -> "Galileo"
             GnssStatus.CONSTELLATION_QZSS -> "QZSS"
             GnssStatus.CONSTELLATION_SBAS -> "SBAS"
-            else -> "Other"
+            else -> otherLabel
         }
     }
 }
